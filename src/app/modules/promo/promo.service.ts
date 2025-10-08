@@ -27,7 +27,7 @@ const createToDB = async (payload: IPromo, userId: mongoose.Types.ObjectId) => {
   }
 
   if (payload.generateQrCode) {
-    const data = { title: payload.title, descripton: payload.description, discount: payload.discount }
+    const data = { title: payload.title, description: payload.description, discount: payload.discount }
     const generatedQRCode = await generateQrCode(data, String(userId))
     payload.QRCode = generatedQRCode
   }
@@ -51,7 +51,7 @@ const updateInDB = async (payload: Partial<IPromo>, userId: mongoose.Types.Objec
   }
 
   if (payload.generateQrCode) {
-    const data = { title: payload.title, descripton: payload.description, discount: payload.discount };
+    const data = { title: payload.title, description: payload.description, discount: payload.discount }
     const generatedQRCode = await generateQrCode(data, String(userId));
     payload.QRCode = generatedQRCode;
   } else {
