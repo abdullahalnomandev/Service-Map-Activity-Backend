@@ -70,16 +70,42 @@ const deleteFromDB = async (userId: mongoose.Types.ObjectId) => {
 };
 
 const getAllFromDB = async (query: Record<string, any>) => {
-  const qb = new QueryBuilder(Business.find().populate('owner', 'name email profileImage'), query)
+
+  // const { lat, lng, km } = query;
+
+  const lat = Number(query.lat)
+  const lng = Number(query.lng)
+  const km = Number(query.km)
+
+  if (lat && lng) {
+    const radiusInMeters = (km || 10) * 1000; // default 10 km
+
+    query.location = {
+      $geoWithin: {
+        $centerSphere: [
+          [lng, lat],
+          radiusInMeters / 6378.1, // radius in radians
+        ],
+      },
+    };
+  }
+
+  const qb = new QueryBuilder(Business.find(), query)
     .paginate()
     .search(['name', 'location'])
     .fields()
     .filter()
     .sort();
-  const data = await qb.modelQuery.lean();
+  const initialData = await qb.modelQuery.lean();
   const pagination = await qb.getPaginationInfo();
-  return { pagination, data };
-};
+
+  const data = Array.isArray(initialData) ? initialData.map(item => ({ ...item, images: undefined, coverPhoto: (item?.images as any)?.[0] ?? null })) : [];
+
+  return {
+    pagination,
+    data
+  };
+}
 
 const getByIdFromDB = async (userId: mongoose.Types.ObjectId, businessId: mongoose.Types.ObjectId) => {
   const business = await Business.findById(businessId, '-location -isApproved -owner')
@@ -115,7 +141,7 @@ const getBusinessByIdFromDB = async (userId: mongoose.Types.ObjectId, businessId
     ]).lean().exec() as IBusiness;
 
 
-  const promoCode = await Promo.findOne({ user: userId },'-generateQrCode -generatePromocode -user').lean().exec() as IPromo | null;
+  const promoCode = await Promo.findOne({ user: userId }, '-generateQrCode -generatePromocode -user').lean().exec() as IPromo | null;
 
   (business as any).promoCode = promoCode;
   if (

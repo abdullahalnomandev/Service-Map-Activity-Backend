@@ -17,6 +17,10 @@ router
     validateRequest(BusinessValidation.createZodSchema),
     BusinessController.create
   )
+  .get(
+    auth(USER_ROLES.ADMIN, USER_ROLES.BUSINESS, USER_ROLES.SUPER_ADMIN, USER_ROLES.USER),
+    BusinessController.getAll
+)
 
 router
   .route('/:id')
