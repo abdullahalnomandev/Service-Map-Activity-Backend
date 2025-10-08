@@ -2,94 +2,102 @@ import config from '../config';
 import { ICreateAccount, IResetPassword } from '../types/emailTamplate';
 const logoImage = 'https://airport-airbnb-website.vercel.app/airbnb-logo.png';
 
-const createAccount = (values: ICreateAccount) => {
+const resetPassWord = (values: ICreateAccount) => {
   const data = {
     to: values.email,
     subject: 'Verify your account',
-    html: `<body style="font-family: Arial, sans-serif; background-color: #f4f6f8; margin: 0; padding: 40px; color: #333;">
-  <div style="max-width: 480px; margin: 0 auto; background: #fff; border-radius: 16px; padding: 40px 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); text-align: center;">
-
-      <!-- Logo -->
-      <img src="${logoImage}" alt="Logo" style="width: 100px; margin-bottom: 24px; border-radius: 50%;" />
-
-      <!-- Title -->
-      <h2 style="color: #111; font-size: 20px; margin-bottom: 12px; font-weight: 600;">
-        Hi ${values.name},
-      </h2>
-      <p style="font-size: 15px; color: #555; margin-bottom: 28px; line-height: 1.6;">
-        Use the following verification code to securely sign in to your <strong>Toothlens</strong> account.
-      </p>
-
-      <!-- OTP Code Box -->
-      <div style="background-color: #002D62; color: #fff; font-size: 26px; font-weight: bold; letter-spacing: 6px; padding: 18px 0; width: 160px; margin: 0 auto 28px; border-radius: 10px; box-shadow: inset 0 -2px 4px rgba(0,0,0,0.15);">
-        ${values.otp}
-      </div>
-
-      <!-- Expiration Note -->
-      <p style="font-size: 14px; color: #666; margin-bottom: 8px;">
-        This code will expire in <strong>3 minutes</strong>.
-      </p>
-
-      <!-- Footer Note -->
-      <p style="font-size: 12px; color: #999; margin-top: 20px; line-height: 1.5;">
-        If you didn’t request this code, you can safely ignore this email.  
-        For security reasons, do not share this code with anyone.
-      </p>
+    html: `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Verification Code</title>
+</head>
+<body style="font-family: 'Inter', Arial, sans-serif; background: #f7f8fa; margin: 0; padding: 0;">
+  <div style="max-width: 440px; margin: 40px auto; background: #111132; border-radius: 18px; padding: 38px 26px 32px 26px; box-shadow: 0 8px 24px rgba(0,0,0,0.13); text-align: center;">
+    <!-- Title -->
+    <h1 style="color: #fff; font-size: 22px; font-weight: 700; margin: 0 0 18px 0; letter-spacing: 0.5px;">
+      Verification Code
+    </h1>
+    <!-- Greeting -->
+    <p style="color: #b3b3d1; font-size: 15px; margin: 0 0 22px 0; line-height: 1.6;">
+      Hi <strong style="color: #fff;">${values.name.split(' ')[0]}</strong>,
+    </p>
+    <!-- Message -->
+    <p style="color: #b3b3d1; font-size: 15px; margin: 0 0 30px 0; line-height: 1.6;">
+      Use the code below to securely sign in to your account.
+    </p>
+    <!-- OTP Code Box -->
+    <div style="display: inline-block; background: #6C2FF9; color: #fff; font-size: 28px; font-weight: 700; letter-spacing: 8px; padding: 18px 0; width: 170px; border-radius: 12px; box-shadow: 0 2px 8px rgba(108,47,249,0.13); margin-bottom: 28px;">
+      ${values.otp}
+    </div>
+    <!-- Expiration Note -->
+    <p style="font-size: 13px; color: #9999b3; margin: 28px 0 0 0;">
+      This code will expire in <strong style="color: #fff;">3 minutes</strong>.
+    </p>
+    <!-- Footer -->
+    <p style="font-size: 12px; color: #777799; margin: 22px 0 0 0; line-height: 1.6;">
+      If you didn’t request this code, you can safely ignore this email.<br />
+      For security reasons, do not share this code with anyone.
+    </p>
   </div>
 </body>
-
+</html>
 `,
   };
   return data;
 };
 
-const resetPassword = (values: IResetPassword) => {
+
+const verifyAccount = (values: { email: string, otp: number, name: string }) => {
   const data = {
     to: values.email,
-    subject: 'Reset your password',
+    subject: 'Verify Your Account',
     html: `
-<body style="font-family: Arial, sans-serif; background-color: #f4f6f8; margin: 0; padding: 40px; color: #333;">
-  <div style="max-width: 520px; margin: 0 auto; background: #fff; border-radius: 14px; padding: 36px 28px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); text-align: center;">
-
-      <!-- Logo -->
-      <img src="${logoImage}" alt="Logo" style="display: block; margin: 0 auto 28px; width: 120px; border-radius: 50%;" />
-
-      <!-- Title -->
-      <h2 style="color: #111; font-size: 20px; font-weight: 600; margin-bottom: 16px;">
-        Reset Your Password
-      </h2>
-
-      <!-- Message -->
-      <p style="color: #555; font-size: 15px; line-height: 1.6; margin-bottom: 28px;">
-        We received a request to reset your password for your <strong>Toothlens</strong> account.  
-        Click the button below to securely create a new password.
-      </p>
-
-      <!-- Reset Button -->
-      <a href="${values.resetLink}" 
-         style="display: inline-block; background-color: #002D62; color: #fff; text-decoration: none; font-size: 16px; font-weight: 600; padding: 14px 28px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); margin-bottom: 28px;">
-        Reset Password
-      </a>
-
-      <!-- Expiration -->
-      <p style="font-size: 14px; color: #666; margin-bottom: 22px;">
-        This link will expire in <strong>30 minutes</strong>.
-      </p>
-
-      <!-- Security Disclaimer -->
-      <p style="font-size: 13px; color: #999; text-align: left; line-height: 1.6; margin-top: 20px;">
-        If you did not request a password reset, please ignore this email.  
-        For security, do not share this link with anyone.
-      </p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Your Account</title>
+</head>
+<body style="font-family: 'Inter', Arial, sans-serif; background: #f7f8fa; margin: 0; padding: 0;">
+  <div style="max-width: 440px; margin: 40px auto; background: #111132; border-radius: 18px; padding: 38px 26px 32px 26px; box-shadow: 0 8px 24px rgba(0,0,0,0.13); text-align: center;">
+    <!-- Title -->
+    <h1 style="color: #fff; font-size: 22px; font-weight: 700; margin: 0 0 18px 0; letter-spacing: 0.5px;">
+      Verify Your Account
+    </h1>
+    <!-- Greeting -->
+    <p style="color: #b3b3d1; font-size: 15px; margin: 0 0 22px 0; line-height: 1.6;">
+      Hi <strong style="color: #fff;">${values.name.split(' ')[0]}</strong>,
+    </p>
+    <!-- Message -->
+    <p style="color: #b3b3d1; font-size: 15px; margin: 0 0 30px 0; line-height: 1.6;">
+      Thank you for signing up! Please use the verification code below to activate your account.
+    </p>
+    <!-- OTP Code Box -->
+    <div style="display: inline-block; background: #6C2FF9; color: #fff; font-size: 28px; font-weight: 700; letter-spacing: 8px; padding: 18px 0; width: 170px; border-radius: 12px; box-shadow: 0 2px 8px rgba(108,47,249,0.13); margin-bottom: 28px;">
+      ${values.otp}
+    </div>
+    <!-- Expiration Note -->
+    <p style="font-size: 13px; color: #9999b3; margin: 28px 0 0 0;">
+      This code will expire in <strong style="color: #fff;">3 minutes</strong>.
+    </p>
+    <!-- Footer -->
+    <p style="font-size: 12px; color: #777799; margin: 22px 0 0 0; line-height: 1.6;">
+      If you didn’t request this code, you can safely ignore this email.<br />
+      For security reasons, do not share this code with anyone.
+    </p>
   </div>
 </body>
-
+</html>
 `,
   };
   return data;
 };
 
 export const emailTemplate = {
-  createAccount,
-  resetPassword,
+  resetPassWord,
+  verifyAccount,
 };

@@ -13,15 +13,26 @@ router.post(
 );
 
 router.post(
+  '/resend-otp',
+  validateRequest(AuthValidation.createResendOTPZodSchema),
+  AuthController.resendOTPtoDB
+);
+
+router.post(
+  '/verify-otp',
+  AuthController.verifyOtp
+);
+
+router.post(
   '/forget-password',
   validateRequest(AuthValidation.createForgetPasswordZodSchema),
   AuthController.forgetPassword
 );
 
+
 router.post(
-  '/verify-email',
-  validateRequest(AuthValidation.createVerifyEmailZodSchema),
-  AuthController.verifyEmail
+  '/verify-reset-otp',
+  AuthController.verifyResetOtp
 );
 
 router.post(
@@ -32,15 +43,10 @@ router.post(
 
 router.post(
   '/change-password',
-  auth(USER_ROLES.GUEST,USER_ROLES.ADMIN,USER_ROLES.GUEST,USER_ROLES.SUPER_ADMIN , USER_ROLES.HOST),
+  auth(USER_ROLES.ADMIN,USER_ROLES.SUPER_ADMIN,USER_ROLES.USER,USER_ROLES.BUSINESS),
   validateRequest(AuthValidation.createChangePasswordZodSchema),
   AuthController.changePassword
 );
 
-router.post(
-  '/resend-otp',
-  validateRequest(AuthValidation.createResendOtpZodSchema),
-  AuthController.resendOtp
-);
 
 export const AuthRoutes = router;

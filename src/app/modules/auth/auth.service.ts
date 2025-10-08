@@ -10,19 +10,139 @@ import {
   IAuthResetPassword,
   IChangePassword,
   ILoginData,
-  IVerifyEmail,
 } from '../../../types/auth';
-import cryptoToken from '../../../util/cryptoToken';
-import generateOTP from '../../../util/generateOTP';
 import { User } from '../user/user.model';
-import { AirlinePersonVerification } from '../airlinePersonVerification/airlinePersonVerificaiton.model';
-import { USER_ROLES } from '../../../enums/user';
+import generateOTP from '../../../util/generateOTP';
+import { IUser } from '../user/user.interface';
+
+
+//resend otp
+const resendOTPtoDB = async (email: string) => {
+  const registedUser = await User.findOne({ email }).lean()
+
+  if (registedUser?.verified) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'This account already verified');
+  }
+
+  if (!registedUser) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'User not found');
+  }
+
+  //send mail
+  const otp = generateOTP();
+  const value = {
+    otp,
+    email: registedUser.email,
+    name: registedUser.name
+  };
+  const verifyAccount = emailTemplate.verifyAccount(value);
+  emailHelper.sendEmail(verifyAccount);
+
+  // Save OTP and expiry to DB
+  const authentication = {
+    oneTimeCode: otp,
+    expireAt: new Date(Date.now() + 3 * 60000),
+  };
+  await User.findByIdAndUpdate(registedUser._id, { $set: { authentication } });
+
+
+  return { message: 'OTP resend successfully' };
+};
+
+
+// VERIFY ACC. WITH OTP
+const verifyOTPToDB = async (payload: { email: string, oneTimeCode: number }) => {
+  const { email, oneTimeCode } = payload;
+
+  const registedUser = await User.findOne({ email }, '_id verified authentication').lean() as IUser;
+
+  if (!registedUser) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'User not found');
+  }
+
+  if (registedUser.verified) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'This account already verified');
+  }
+
+  // Check if authentication, OTP, and expireAt exist
+  if (!registedUser?.authentication?.oneTimeCode) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'OTP not found or not requested');
+  }
+
+  // Check OTP match
+  if (registedUser.authentication.oneTimeCode !== oneTimeCode) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid OTP');
+  }
+
+  // Check OTP expiry
+  const now = new Date();
+  if (registedUser.authentication.expireAt && registedUser.authentication.expireAt < now) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'OTP has expired');
+  }
+
+  // Mark user as verified and clear OTP
+  await User.findByIdAndUpdate(
+    registedUser._id,
+    {
+      $set: {
+        verified: true,
+        'authentication.oneTimeCode': null,
+        'authentication.expireAt': null,
+      },
+    },
+    { new: true }
+  );
+
+  return { message: 'Account verified successfully' };
+};
+
+// VERIFY OTP TO RESET PASSWORD
+const verifyResetOtp = async (payload: { email: string, oneTimeCode: number }) => {
+  const { email, oneTimeCode } = payload;
+
+  const registedUser = await User.findOne({ email }, '_id verified authentication').lean() as IUser;
+
+  if (!registedUser) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'User not found');
+  }
+
+
+  // Check if authentication, OTP, and expireAt exist
+  if (!registedUser?.authentication?.oneTimeCode) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'OTP not found or not requested');
+  }
+
+  // Check OTP match
+  if (registedUser.authentication.oneTimeCode !== oneTimeCode) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid OTP');
+  }
+
+  // Check OTP expiry
+  const now = new Date();
+  if (registedUser.authentication.expireAt && registedUser.authentication.expireAt < now) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'OTP has expired');
+  }
+
+  // Mark user as verified and clear OTP
+  await User.findByIdAndUpdate(
+    registedUser._id,
+    {
+      $set: {
+        'authentication.isResetPassword': true
+      },
+    },
+    { new: true }
+  );
+
+  return { message: 'OTP verified successfully' };
+};
+
 
 //login
 const loginUserFromDB = async (payload: ILoginData) => {
   const { email, password } = payload;
   const isExistUser = await User.findOne({ email }).select('+password');
-  
+
   if (!isExistUser) {
     throw new ApiError(StatusCodes.BAD_REQUEST, "User doesn't exist!");
   }
@@ -32,15 +152,6 @@ const loginUserFromDB = async (payload: ILoginData) => {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
       'Please verify your account, then try to login again'
-    );
-  }
-
-  const isUserVerified = await AirlinePersonVerification.findOne({email:payload.email,paymentStatus:'paid'});
-  
-  if (!isUserVerified && isExistUser.role !== USER_ROLES.ADMIN && isExistUser.role !== USER_ROLES.SUPER_ADMIN) {
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'Please verify your airline account, then try to login again'
     );
   }
 
@@ -62,7 +173,7 @@ const loginUserFromDB = async (payload: ILoginData) => {
 
   //create token
   const createToken = jwtHelper.createToken(
-    { id: isExistUser._id, role: isExistUser.role, email: isExistUser.email },
+    { id: isExistUser._id, role: isExistUser.role },
     config.jwt.jwt_secret as Secret,
     config.jwt.jwt_expire_in as string
   );
@@ -72,139 +183,82 @@ const loginUserFromDB = async (payload: ILoginData) => {
 
 //forget password
 const forgetPasswordToDB = async (email: string) => {
-  const isExistUser = await User.isExistUserByEmail(email);
+
+  const isExistUser = await User.isExistUserByEmail(email) as IUser;
   if (!isExistUser) {
     throw new ApiError(StatusCodes.BAD_REQUEST, "User doesn't exist!");
   }
 
   //send mail
-  const createResetToken = jwtHelper.createToken(
-    { id: isExistUser._id, email: isExistUser.email },
-    config.jwt.jwt_secret as Secret,
-    '2m'
-  );
+  const otp = generateOTP();
   const value = {
-    resetLink: `${config.frontend_url}/reset-password?token=${createResetToken}`,
+    otp,
     email: isExistUser.email,
+    name: isExistUser.name
   };
-  const forgetPassword = emailTemplate.resetPassword(value);
+  const forgetPassword = emailTemplate.resetPassWord(value);
   emailHelper.sendEmail(forgetPassword);
-};
 
-//verify email
-const verifyEmailToDB = async (payload: IVerifyEmail) => {
-  const { email, oneTimeCode } = payload;
-  const isExistUser = await User.findOne({ email })
-    .select('+authentication')
-    .lean()
-    .exec();
-  if (!isExistUser) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, "User doesn't exist!");
-  }
+  //save to DB
+  const authentication = {
+    isResetPassword:false,
+    oneTimeCode: otp,
+    expireAt: new Date(Date.now() + 3 * 60000),
+  };
+  await User.findByIdAndUpdate(isExistUser._id, { $set: { authentication } });
 
-  if (!oneTimeCode) {
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'Please give the otp, check your email we send a code'
-    );
-  }
-
-  if (isExistUser.authentication?.oneTimeCode !== oneTimeCode) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'You provided wrong otp');
-  }
-
-  const date = new Date();
-  if (date > isExistUser.authentication?.expireAt) {
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'Otp already expired, Please try again'
-    );
-  }
-
-  let message;
-  let data;
-
-  if (!isExistUser.verified) {
-    await User.findOneAndUpdate(
-      { _id: isExistUser._id },
-      { verified: true, authentication: { oneTimeCode: null, expireAt: null } }
-    );
-    message = 'Email verify successfully';
-  } else {
-    await User.findOneAndUpdate(
-      { _id: isExistUser._id },
-      {
-        authentication: {
-          isResetPassword: true,
-          oneTimeCode: null,
-          expireAt: null,
-        },
-      }
-    );
-
-    //create token ;
-    const createToken = cryptoToken();
-    message =
-      'Verification Successful: Please securely store and utilize this code for reset password';
-    data = createToken;
-  }
-  return { data, message };
 };
 
 //reset password
 const resetPasswordToDB = async (payload: IAuthResetPassword) => {
-  const { newPassword, confirmPassword, token } = payload;
 
-  if (!token) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'Reset token is required');
-  }
-  // verify token without throwing
-  const decodedUser = jwtHelper.verifyToken(
-    token,
-    config.jwt.jwt_secret as Secret
-  ) as { id: string } | null;
+  const { newPassword, confirmPassword, otp } = payload;
 
-  if (!decodedUser) {
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'Token has expired or is invalid'
-    );
+  if (!otp) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'OTP is required');
   }
+
 
   // check user exists
-  const isExistUser = await User.findById(decodedUser.id)
+  const isExistUser = await User.findOne({ 'authentication.oneTimeCode': otp, 'authentication.isResetPassword': true })
     .select('_id password')
     .lean();
   if (!isExistUser) {
-    throw new ApiError(StatusCodes.NOT_FOUND, 'User not found');
+    throw new ApiError(StatusCodes.NOT_FOUND, 'OTP is not valid to find user');
   }
 
+
+  //check password
   if (newPassword !== confirmPassword) {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
-      'New password and confirm password do not match'
+      "New password and Confirm password doesn't match!"
     );
   }
 
-  // hash new password
+  //hash password
   const hashPassword = await bcrypt.hash(
     newPassword,
     Number(config.bcrypt_salt_rounds)
   );
 
-  // update user password
-  await User.findByIdAndUpdate(
-    decodedUser.id,
-    {
-      password: hashPassword,
-      'authentication.isResetPassword': false,
+  const updateData = {
+    password: hashPassword,
+    authentication: {
+      expireAt: null,
+      oneTimeCode: null,
+      isResetPassword: false
     },
-    { new: true }
-  );
+  };
+
+  await User.findByIdAndUpdate({ _id: isExistUser._id }, updateData, {
+    new: true,
+  });
 
   return { message: 'Password reset successful' };
 };
 
+// change password
 const changePasswordToDB = async (
   user: JwtPayload,
   payload: IChangePassword
@@ -250,46 +304,15 @@ const changePasswordToDB = async (
   await User.findOneAndUpdate({ _id: user.id }, updateData, { new: true });
 };
 
-const resendOtpToDB = async (email: string) => {
-  //set role
-  const registedUser = await User.findOne({email},'email verified').lean()
 
-  if(registedUser?.verified){
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'User already verified');
-  }
-
-  if (!registedUser) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'User not found');
-  }
-
-  //send email
-  const otp = generateOTP();
-  const values = {
-    name: registedUser.name,
-    otp: otp,
-    email: registedUser.email!,
-  };
-  const createAccountTemplate = emailTemplate.createAccount(values);
-  emailHelper.sendEmail(createAccountTemplate);
-
-  //save to DB
-  const authentication = {
-    oneTimeCode: otp,
-    expireAt: new Date(Date.now() + 3 * 60000),
-  };
-  await User.findOneAndUpdate(
-    { _id: registedUser._id },
-    { $set: { authentication } }
-  );
-
-  return { message: 'Otp resend successfully' };
-};
 
 export const AuthService = {
-  verifyEmailToDB,
-  loginUserFromDB,
   forgetPasswordToDB,
+  loginUserFromDB,
   resetPasswordToDB,
-  changePasswordToDB,
-  resendOtpToDB,
+  resendOTPtoDB,
+  verifyOTPToDB,
+  verifyResetOtp,
+  changePasswordToDB
+  
 };

@@ -16,7 +16,7 @@ const transporter = nodemailer.createTransport({
 const sendEmail = async (values: ISendEmail) => {
   try {
     const info = await transporter.sendMail({
-      from: `"Flight Delay Stays" ${config.email.from}`,
+      from: `"Service Map Activity" ${config.email.from}`,
       to: values.to,
       subject: values.subject,
       html: values.html,

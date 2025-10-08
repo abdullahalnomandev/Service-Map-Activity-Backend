@@ -1,27 +1,21 @@
 import { Model, Types } from 'mongoose';
 import { USER_ROLES } from '../../../enums/user';
-import { IairlinePersonVerification } from '../airlinePersonVerification/airlineVerification.interface';
-
+import mongoose from 'mongoose';
 export type IUser = {
+  _id?:string;
   name: string;
-  airlinePersonVerification?:Types.ObjectId | IairlinePersonVerification;
-  role: USER_ROLES;
-  contact: string;
+  profileImage?: string;
   email: string;
   password: string;
-  address: string;
-  connectedAccountId: string;
-  stripeConnectedLink: string;
-  isVerifiedHost:boolean;
-  dateOfBirth:Date;
-  images: string[];
-  profilePic:string;
-  status: 'active' | 'block';
-  verified: boolean;
+  confirmPassword:string;
+  status?: 'active' | 'block';
+  role?: USER_ROLES;
+  verified?: boolean;
+  preferences?: mongoose.ObjectId[];
   authentication?: {
-    isResetPassword: boolean;
-    oneTimeCode: number;
-    expireAt: Date;
+    isResetPassword?: boolean;
+    oneTimeCode?: number | null;
+    expireAt?: Date | null;
   };
 };
 

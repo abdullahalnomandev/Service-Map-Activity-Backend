@@ -12,13 +12,9 @@ const userSchema = new Schema<IUser, UserModal>(
       type: String,
       required: true,
     },
-    profilePic: {
+    profileImage: {
       type: String,
       default: 'https://i.ibb.co/z5YHLV9/profile.png',
-    },
-    isVerifiedHost: {
-      type: Boolean,
-      default: false
     },
     email: {
       type: String,
@@ -26,34 +22,11 @@ const userSchema = new Schema<IUser, UserModal>(
       unique: true,
       lowercase: true,
     },
-    contact: {
-      type: String,
-      default: null,
-    },
-    address: {
-      type: String,
-      default: null,
-    },
-    connectedAccountId: {
-      type: String,
-      default: null,
-    },
-    stripeConnectedLink: {
-      type: String,
-      default: null
-    },
-    dateOfBirth: {
-      type: Date
-    },
     password: {
       type: String,
       required: true,
       select: 0,
       minlength: 8,
-    },
-    images: {
-      type: [String],
-      required: true,
     },
     status: {
       type: String,
@@ -62,8 +35,15 @@ const userSchema = new Schema<IUser, UserModal>(
     },
     role: {
       type: String,
-      default: USER_ROLES.GUEST
+      default: USER_ROLES.USER
     },
+    preferences: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'Preference',
+        require:false
+      }
+    ],
     verified: {
       type: Boolean,
       default: false,
@@ -110,10 +90,16 @@ userSchema.statics.isMatchPassword = async (
 
 //check user
 userSchema.pre('save', async function (next) {
+
+  console.log('CALLED')
   //check user
   const isExist = await User.findOne({ email: this.email });
   if (isExist) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Email already exist!');
+  }
+
+  if (!this.password) {
+    return;
   }
 
   //password hash

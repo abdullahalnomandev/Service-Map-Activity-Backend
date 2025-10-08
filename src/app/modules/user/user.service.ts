@@ -1,6 +1,4 @@
 import { StatusCodes } from 'http-status-codes';
-import { JwtPayload } from 'jsonwebtoken';
-import { USER_ROLES } from '../../../enums/user';
 import ApiError from '../../../errors/ApiError';
 import { emailHelper } from '../../../helpers/emailHelper';
 import { emailTemplate } from '../../../shared/emailTemplate';
@@ -11,111 +9,50 @@ import { User } from './user.model';
 import QueryBuilder from '../../builder/QueryBuilder';
 import { userSearchableField } from './user.constant';
 
+
+
 const createUserToDB = async (payload: Partial<IUser>): Promise<{ message: string }> => {
-  //set role
-  payload.role = USER_ROLES.GUEST;
+  console.log({ payload });
+
+  // Check if user already exists by email
+  if (!payload.email) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Email is required');
+  }
+  const isExistUser = await User.findOne({ email: payload.email });
+  if (isExistUser) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'User already exists with this email');
+  }
+
+  // Check password and confirmPassword match
+  if (payload.password !== payload.confirmPassword) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Passwords do not match');
+  }
+
+
+  // Create user
   const createUser = await User.create(payload);
   if (!createUser) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to create user');
   }
 
-  //send email
+  // Send verification email
   const otp = generateOTP();
-  const values = {
-    name: createUser.name,
-    otp: otp,
-    email: createUser.email!,
+  const value = {
+    otp,
+    email: createUser.email,
+    name: createUser.name
   };
-  const createAccountTemplate = emailTemplate.createAccount(values);
-  emailHelper.sendEmail(createAccountTemplate);
+  const verifyAccount = emailTemplate.verifyAccount(value);
+    emailHelper.sendEmail(verifyAccount);
 
-  //save to DB
+  // Save OTP and expiry to DB
   const authentication = {
     oneTimeCode: otp,
     expireAt: new Date(Date.now() + 3 * 60000),
   };
-  await User.findOneAndUpdate(
-    { _id: createUser._id },
-    { $set: { authentication } }
-  );
+  await User.findByIdAndUpdate(createUser._id, { $set: { authentication } });
 
   return { message: "User created successfully" };
-};
-
-const getUserProfileFromDB = async (
-  userId: string
-): Promise<Partial<IUser>> => {
-  const existingUser = await User.findById(userId).populate({
-    path: 'airlineVerification',
-    match: { paymentStatus: "paid" },
-    populate: {
-      path: 'plan',
-      select: '-active'
-    },
-    select: 'designation plan employeeId images paymentStatus paymentMethod'
-  });
-  if (!existingUser) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, "User doesn't exist!");
-  }
-
-  return existingUser;
-};
-
-const updateProfileToDB = async (
-  user: JwtPayload,
-  payload: Partial<IUser>
-): Promise<Partial<IUser | null>> => {
-  const { id } = user;
-  const isExistUser = await User.findById(id);
-  if (!isExistUser) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, "User doesn't exist!");
-  }
-
-  //unlink file here
-  if (payload.images) {
-    unlinkFiles(isExistUser.images);
-  }
-
-  if (payload.profilePic) {
-    unlinkFile(isExistUser.profilePic);
-  }
-
-  const updateDoc = await User.findOneAndUpdate({ _id: id }, payload, {
-    new: true,
-  });
-
-  return updateDoc;
-};
-const createNewUserToDB = async (
-  payload: Partial<IUser>
-): Promise<Partial<IUser | null>> => {
-
-  const createUser = await User.create(payload);
-  if (!createUser) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to create user');
-  }
-
-  //send email
-  const otp = generateOTP();
-  const values = {
-    name: createUser.name,
-    otp: otp,
-    email: createUser.email!,
-  };
-  const createAccountTemplate = emailTemplate.createAccount(values);
-  emailHelper.sendEmail(createAccountTemplate);
-
-  //save to DB
-  const authentication = {
-    oneTimeCode: otp,
-    expireAt: new Date(Date.now() + 3 * 60000),
-  };
-  await User.findOneAndUpdate(
-    { _id: createUser._id },
-    { $set: { authentication } }
-  );
-
-  return createUser;
 };
 
 const updateUserToDB = async (
@@ -126,18 +63,15 @@ const updateUserToDB = async (
   // console.log({userId,payload})
 
 
-  const isExistUser = await User.isExistUserById(userId);
+  const isExistUser = await User.isExistUserById(userId) as IUser;
   if (!isExistUser) {
     throw new ApiError(StatusCodes.BAD_REQUEST, "User doesn't exist!");
   }
 
   //unlink file here
   if (payload) {
-    if (isExistUser.images && isExistUser.images.length > 0) {
-      unlinkFiles(isExistUser.images);
-    }
-    if (isExistUser.profilePic) {
-      unlinkFile(isExistUser.profilePic);
+    if (isExistUser.profileImage) {
+      unlinkFile(isExistUser.profileImage);
     }
   }
   const updateDoc = await User.findOneAndUpdate({ _id: userId }, payload, {
@@ -155,17 +89,7 @@ const getAllUsers = async (query: Record<string, any>) => {
     .filter()
     .sort();
 
-  const data = await result.modelQuery
-    .populate({
-      path: "airlineVerification",
-      match: { paymentStatus: "paid" },
-      select: "designation plan employeeId images paymentStatus paymentMethod",
-      populate: {
-        path: "plan",
-        select: "-active",
-      },
-    })
-    .lean();
+  const data = await result.modelQuery.lean();
 
   const pagination = await result.getPaginationInfo();
 
@@ -175,97 +99,20 @@ const getAllUsers = async (query: Record<string, any>) => {
   };
 };
 
-const deleteUserFromDB = async (
-  userId: string
-): Promise<Partial<IUser | null>> => {
-  const isExistUser = await User.isExistUserById(userId);
-  if (!isExistUser) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, "User doesn't exist!");
-  }
 
-  //unlink file here
-  if (isExistUser.logo) {
-    unlinkFiles(isExistUser.logo);
-  }
-  if (isExistUser.profilePic) {
-    unlinkFile(isExistUser.profilePic);
-  }
-
-  // Toggle user status between active and block
-  const newStatus = isExistUser.status === 'active' ? 'block' : 'active';
-  const updatedUser = await User.findByIdAndUpdate(
-    userId,
-    { status: newStatus },
-    { new: true }
-  );
-  
-  return updatedUser;
-};
-
-const verifyHost = async (
-  userId: string
-): Promise<Partial<IUser | null>> => {
-  const isExistUser = await User.isExistUserById(userId);
-  if (!isExistUser) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, "User doesn't exist!");
-  }
-
-  //unlink file here
-  if (isExistUser.logo) {
-    unlinkFiles(isExistUser.logo);
-  }
-  if (isExistUser.profilePic) {
-    unlinkFile(isExistUser.profilePic);
-  }
-
-  // Toggle isVerifiedHost between true and false
-  const newVerificationStatus = isExistUser.isVerifiedHost ? false : true;
-  const updatedUser = await User.findByIdAndUpdate(
-    userId,
-    { isVerifiedHost: newVerificationStatus },
-    { new: true }
-  );
-  
-  return updatedUser;
-};
-
-const getAllHost = async (query: Record<string, any>) => {
-
-  query.role = 'host';
-  const result = new QueryBuilder(User.find(), query)
-    .paginate()
-    .search(userSearchableField)
-    .fields()
-    .filter()
-    .sort();
-
-  const data = await result.modelQuery
-    .populate({
-      path: "airlineVerification",
-      match: { paymentStatus: "paid" },
-      select: "designation employeeId",
-      // populate: {
-      //   path: "plan",
-      //   select: "-active",
-      // },
-    })
+const getProfile = async (userId: string) => {
+  const user = await User.findOne({ _id: userId })
+    .populate({ path: 'preferences', select: '_id name' })
     .lean();
-
-  const pagination = await result.getPaginationInfo();
-
-  return {
-    pagination,
-    data,
-  };
+  if (!user) {
+    throw new ApiError(500, "User not found");
+  }
+  return user;
 };
+
 export const UserService = {
   createUserToDB,
-  getUserProfileFromDB,
-  updateProfileToDB,
-  createNewUserToDB,
   getAllUsers,
   updateUserToDB,
-  deleteUserFromDB,
-  verifyHost,
-  getAllHost
-}; createNewUserToDB
+  getProfile
+};

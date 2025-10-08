@@ -40,7 +40,7 @@ const createChangePasswordZodSchema = z.object({
   }),
 });
 
-const createResendOtpZodSchema = z.object({
+const createResendOTPZodSchema = z.object({
   body: z.object({
     email: z.string({ required_error: 'Email is required' }),
   }),
@@ -52,5 +52,5 @@ export const AuthValidation = {
   createLoginZodSchema,
   createResetPasswordZodSchema,
   createChangePasswordZodSchema,
-  createResendOtpZodSchema,
+  createResendOTPZodSchema,
 };
