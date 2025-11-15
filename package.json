@@ -31,6 +31,7 @@
     "typescript": "^5.5.3"
   },
   "dependencies": {
+    "@googlemaps/google-maps-services-js": "googlemaps/google-maps-services-js",
     "@types/qrcode": "^1.5.5",
     "bcrypt": "^5.1.1",
     "colors": "^1.4.0",
