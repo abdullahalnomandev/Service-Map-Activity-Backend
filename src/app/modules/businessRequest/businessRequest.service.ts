@@ -5,6 +5,8 @@ import { IBusinessRequest } from './businessRequest.interface';
 import { BusinessRequest } from './businessRequest.model';
 import { mongo } from 'mongoose';
 import { buesinessRequestSearchableFields } from './businessRequest.constant';
+import { User } from '../user/user.model';
+import { USER_ROLES } from '../../../enums/user';
 
 const createToDB = async (payload: IBusinessRequest, userId: mongo.ObjectId) => {
 
@@ -22,9 +24,13 @@ const createToDB = async (payload: IBusinessRequest, userId: mongo.ObjectId) => 
 };
 
 const updateInDB = async (id: string, payload: Partial<IBusinessRequest>) => {
+  console.log(payload)
   const updated = await BusinessRequest.findByIdAndUpdate(id, payload, { new: true });
+
   if (!updated) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Business request not found');
+  } else{
+     await User.findByIdAndUpdate(updated?.user, {role:USER_ROLES.BUSINESS},{new:true})
   }
   return updated;
 };

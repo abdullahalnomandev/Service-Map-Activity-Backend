@@ -12,6 +12,7 @@ export type IUser = {
   role?: USER_ROLES;
   verified?: boolean;
   preferences?: mongoose.ObjectId[];
+  restaurant_crowd_status?: 'normal' | 'high' | 'overloaded';
   authentication?: {
     isResetPassword?: boolean;
     oneTimeCode?: number | null;

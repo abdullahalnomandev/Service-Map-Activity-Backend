@@ -10,8 +10,8 @@ const router = express.Router();
 router
   .route('/')
   .post(
-    // auth(USER_ROLES.BUSINESS, USER_ROLES.SUPER_ADMIN , USER_ROLES.SUPER_ADMIN, USER_ROLES.USER),
-    auth(USER_ROLES.USER),
+    auth(USER_ROLES.BUSINESS, USER_ROLES.SUPER_ADMIN , USER_ROLES.SUPER_ADMIN, USER_ROLES.USER),
+    // auth(USER_ROLES.USER),
     validateRequest(PromoValidation.createZodSchema),
     PromoController.create
   )

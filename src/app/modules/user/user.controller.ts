@@ -28,13 +28,14 @@ const updateUser = catchAsync(
     const userId = req.user?.id;
     let profileImage = getSingleFilePath(req.files, 'profileImage');
 
-    const { name, preferences} = req.body;
+    const { name, preferences, restaurant_crowd_status} = req.body;
 
     const data: any = {};
 
     if (profileImage) data.profileImage = profileImage;
     if (name != null) data.name = name;
     if (preferences != null) data.preferences = preferences;
+    if (restaurant_crowd_status != null) data.restaurant_crowd_status = restaurant_crowd_status;
 
      console.log(req.files)
     const result = await UserService.updateUserToDB(userId, data);
