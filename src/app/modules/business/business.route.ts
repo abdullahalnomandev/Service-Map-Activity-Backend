@@ -13,13 +13,21 @@ router
   .post(
     fileUploadHandler(),
     // auth(USER_ROLES.ADMIN,USER_ROLES.BUSINESS,USER_ROLES.SUPER_ADMIN),
-    auth(USER_ROLES.USER),
+    auth(USER_ROLES.BUSINESS),
     validateRequest(BusinessValidation.createZodSchema),
     BusinessController.create
   )
   .get(
     auth(USER_ROLES.ADMIN, USER_ROLES.BUSINESS, USER_ROLES.SUPER_ADMIN, USER_ROLES.USER),
     BusinessController.getAll
+)
+
+router
+  .route('/my-business')
+  .get(
+    auth(USER_ROLES.ADMIN, USER_ROLES.BUSINESS, USER_ROLES.SUPER_ADMIN),
+    // auth(USER_ROLES.USER),
+    BusinessController.myBusiness
 )
 
 router
@@ -30,8 +38,8 @@ router
     BusinessController.update
   )
   .get(
-    // auth(USER_ROLES.ADMIN, USER_ROLES.BUSINESS, USER_ROLES.SUPER_ADMIN),
-    auth(USER_ROLES.USER),
+    auth(USER_ROLES.ADMIN, USER_ROLES.BUSINESS, USER_ROLES.SUPER_ADMIN),
+    // auth(USER_ROLES.USER),
     BusinessController.getById
   )
 

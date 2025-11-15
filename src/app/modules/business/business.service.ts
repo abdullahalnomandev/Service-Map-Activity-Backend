@@ -7,6 +7,7 @@ import mongoose from 'mongoose';
 import { getLatLongWithLocalRequest } from './business.util';
 import { Promo } from '../promo/promo.model';
 import { IPromo } from '../promo/promo.interface';
+import { User } from '../user/user.model';
 
 const createToDB = async (payload: IBusiness, userId: mongoose.Types.ObjectId) => {
   // Check if business already exists for this user
@@ -98,9 +99,20 @@ const getAllFromDB = async (query: Record<string, any>) => {
     .sort();
   const initialData = await qb.modelQuery.lean();
   const pagination = await qb.getPaginationInfo();
+  console.log(initialData)
 
-  const data = Array.isArray(initialData) ? initialData.map(item => ({ ...item, images: undefined, coverPhoto: (item?.images as any)?.[0] ?? null })) : [];
-
+  const data = Array.isArray(initialData) ? await Promise.all(
+    initialData.map(async (item) => {
+      const user = await User.findById(item.owner, 'restaurant_crowd_status').lean().exec();
+      const { owner, ...rest } = item as any;
+      return {
+        ...rest,
+        images: undefined,
+        coverPhoto: (item?.images as any)?.[0] ?? 'normal',
+        crowdStatus: user?.restaurant_crowd_status ?? 'normal',
+      };
+    })
+  ) : [];
   return {
     pagination,
     data
@@ -125,6 +137,30 @@ const getByIdFromDB = async (userId: mongoose.Types.ObjectId, businessId: mongoo
   delete (business as any).images;
   return business;
 };
+
+const myBussIness = async (userId: mongoose.Types.ObjectId) => {
+  const business = await Business.findOne({ owner: userId }, '-location -isApproved -owner')
+    .populate([
+      {
+        path: 'images.uploadedBy',
+        select: 'name profileImage',
+        options: { strictPopulate: false },
+      }
+    ]).lean().exec() as IBusiness | null;
+
+  if (!business) {
+    throw new ApiError(404, 'Business not found');
+  }
+
+  const gallery = business.images?.filter(({ uploadedBy }) => uploadedBy?._id?.toString() === userId.toString()) || [];
+  const usersPictures = business.images?.filter(({ uploadedBy }) => uploadedBy?._id?.toString() !== userId.toString()) || [];
+
+  (business as any).gallery = gallery;
+  (business as any).usersPictures = usersPictures;
+  delete (business as any).images;
+  return business;
+};
+
 
 
 const getBusinessByIdFromDB = async (userId: mongoose.Types.ObjectId, businessId: mongoose.Types.ObjectId) => {
@@ -165,5 +201,8 @@ export const BusinessService = {
   deleteFromDB,
   getAllFromDB,
   getByIdFromDB,
-  getBusinessByIdFromDB
+  getBusinessByIdFromDB,
+  myBussIness
 };
+
+

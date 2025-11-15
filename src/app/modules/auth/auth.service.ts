@@ -54,7 +54,7 @@ const resendOTPtoDB = async (email: string) => {
 const verifyOTPToDB = async (payload: { email: string, oneTimeCode: number }) => {
   const { email, oneTimeCode } = payload;
 
-  const registedUser = await User.findOne({ email }, '_id verified authentication').lean() as IUser;
+  const registedUser = await User.findOne({ email }, '_id verified authentication role').lean() as IUser;
 
   if (!registedUser) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'User not found');
@@ -93,7 +93,15 @@ const verifyOTPToDB = async (payload: { email: string, oneTimeCode: number }) =>
     { new: true }
   );
 
-  return { message: 'Account verified successfully' };
+  //create token
+  const createToken = jwtHelper.createToken(
+    { id: registedUser._id, role: registedUser.role },
+    config.jwt.jwt_secret as Secret,
+    config.jwt.jwt_expire_in as string
+  );
+
+
+  return { message: 'Account verified successfully', token: createToken };
 };
 
 // VERIFY OTP TO RESET PASSWORD
@@ -128,13 +136,24 @@ const verifyResetOtp = async (payload: { email: string, oneTimeCode: number }) =
     registedUser._id,
     {
       $set: {
+        verified: true,
+        'authentication.oneTimeCode': null,
+        'authentication.expireAt': null,
         'authentication.isResetPassword': true
       },
     },
     { new: true }
   );
 
-  return { message: 'OTP verified successfully' };
+  //create token
+  const createToken = jwtHelper.createToken(
+    { id: registedUser._id, role: registedUser.role },
+    config.jwt.jwt_secret as Secret,
+    config.jwt.jwt_expire_in as string
+  );
+
+
+  return { message: 'OTP verified successfully',token:createToken };
 };
 
 
@@ -149,10 +168,31 @@ const loginUserFromDB = async (payload: ILoginData) => {
 
   //check verified and status
   if (!isExistUser.verified) {
+
+
+    // Send verification email
+    const otp = generateOTP();
+    const value = {
+      otp,
+      email: isExistUser?.email,
+      name: isExistUser?.name
+    };
+    const verifyAccount = emailTemplate.verifyAccount(value);
+    emailHelper.sendEmail(verifyAccount);
+
+    // Save OTP and expiry to DB
+    const authentication = {
+      oneTimeCode: otp,
+      expireAt: new Date(Date.now() + 3 * 60000),
+    };
+    await User.findByIdAndUpdate(isExistUser._id, { $set: { authentication } });
+
     throw new ApiError(
-      StatusCodes.BAD_REQUEST,
+      StatusCodes.FORBIDDEN,
       'Please verify your account, then try to login again'
     );
+
+
   }
 
   //check user status
@@ -201,7 +241,7 @@ const forgetPasswordToDB = async (email: string) => {
 
   //save to DB
   const authentication = {
-    isResetPassword:false,
+    isResetPassword: false,
     oneTimeCode: otp,
     expireAt: new Date(Date.now() + 3 * 60000),
   };
@@ -314,5 +354,5 @@ export const AuthService = {
   verifyOTPToDB,
   verifyResetOtp,
   changePasswordToDB
-  
+
 };

@@ -73,6 +73,17 @@ const getById = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const myBusiness = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const result = await BusinessService.myBussIness(userId);
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Business retrieved successfully',
+    data: result,
+  });
+});
+
 const getBusnessById = catchAsync(async (req: Request, res: Response) => {
   const userId = req.user?.id;
   const businessId= (req.params as any)?.id
@@ -85,4 +96,4 @@ const getBusnessById = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-export const BusinessController = { create, update, remove, getAll, getById,getBusnessById };
+export const BusinessController = { create, update, remove, getAll, getById,getBusnessById,myBusiness };
