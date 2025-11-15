@@ -13,7 +13,8 @@ router
     .route('/')
     .post(
         // auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN),
-        auth(USER_ROLES.USER),
+        auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN, USER_ROLES.USER),
+        // auth(USER_ROLES.USER),
         validateRequest(PreferenceValidation.createZodSchema),
         PreferenceController.create
     )

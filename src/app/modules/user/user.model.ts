@@ -44,6 +44,10 @@ const userSchema = new Schema<IUser, UserModal>(
         require:false
       }
     ],
+    restaurant_crowd_status: {
+      type: String,
+      enum: ['normal', 'high', 'overloaded']
+    },
     verified: {
       type: Boolean,
       default: false,
